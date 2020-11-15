@@ -1,0 +1,39 @@
+{
+  "name": "node-drayton-wiser",
+  "description": "A (currently experimental) Node.js module for working with the Drayton Wiser smart heating system.",
+  "version": "0.1.0-dev",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "npm run test002",
+    "test002": "node tests/002-full-compare.js",
+    "test001": "node tests/001-connect.js"
+  },
+  "dependencies": {
+    "axios": "^0.21.0",
+    "deep-object-diff": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.7"
+  },
+  "peerDependencies": {},
+  "engines": {
+    "node": ">=10.9"
+  },
+  "keywords": [
+    "node",
+    "nodejs",
+    "drayton",
+    "wiser",
+    "home-automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TotallyInformation/node-drayton-wiser.git"
+  },
+  "author": "Julian Knight (https://it.knightnet.org.uk)",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/TotallyInformation/node-drayton-wiser/issues"
+  },
+  "homepage": "https://github.com/TotallyInformation/node-drayton-wiser#readme"
+}
