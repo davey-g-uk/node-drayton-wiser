@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "npm run test002",
+    "test003": "node tests/003-get-room.js",
     "test002": "node tests/002-full-compare.js",
     "test001": "node tests/001-connect.js"
   },
