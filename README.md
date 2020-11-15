@@ -108,7 +108,9 @@ A quick connection test. Call `setConfig` first.
 
 ### get
 
-Get any known section of the data from the controller. The following sections are understood:
+Return any known section of the data from the controller. 
+
+The following data sections are understood:
 
 * **network**: `/data/network/`, Controller's network info including curr/max/min WiFi signal strength
 * **wifiRSSI**: `/data/network/Station/RSSI/`,
@@ -126,4 +128,18 @@ Get any known section of the data from the controller. The following sections ar
 
 ### getFull
 
-Gets the full `/data/domain/` JSON. Returns a Promise.
+Gets the full `/data/domain/` JSON. Returns a Promise. Also updates the saved data and recreates the room to device map.
+
+The following functions can only be used from within the `.then` function of getFull otherwise the `saved` variable 
+containing the latest data from the controller is not populated.
+
+#### getRoom
+#### getRoomByName
+#### getRoomStat
+#### doRoomMap
+
+## To Do
+
+* Add set functions
+* Add full output
+* Output added/deleted items not just updated.
