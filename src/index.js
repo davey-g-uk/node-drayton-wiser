@@ -73,10 +73,62 @@ const Wiser = function() {
     let connectionOK = false
 
     let dataDiff = {}
-    let prev = {}
+    let saved = undefined
+    let prev = undefined
+    let roomMap = {}
 
     //#endregion ---- Private Variables ---- //
 
+    const getRoom = (roomId) => {
+        //console.log('SAVED:', Object.keys(saved))
+        //console.log('SAVED #rooms:', saved.Room.length)
+        return saved.Room.filter( room => {
+            return room.id === roomId
+        })[0]
+    }
+
+    const getRoomByName = (roomName) => {
+        //console.log('SAVED:', Object.keys(saved))
+        //console.log('SAVED #rooms:', saved.Room.length)
+        return saved.Room.filter( room => {
+            return room.Name === roomName
+        })[0]
+    }
+
+    const getRoomStat = (roomStatId) => {
+        
+    }
+
+    const getTRV = (trvid) => {
+        
+    }
+
+    /** Rebuild the roommap (device id => room) */
+    const doRoomMap = () => {
+        roomMap = {}
+        saved.Room.forEach( room => {
+
+            // SmartValves
+            if ( room.SmartValveIds ) {
+                room.SmartValveIds.forEach( trvId => {
+                    roomMap[trvId] = {'roomId': room.id, 'roomName': room.Name, 'type': 'SmartValve'}
+                })
+            }
+            // RoomStats
+            if ( room.RoomStatId ) {
+                roomMap[room.RoomStatId] = {'roomId': room.id, 'roomName': room.Name, 'type': 'RoomStat'}
+            }
+            // plugs
+            // I don't have any - so this is guesswork - let me know whether it is right or wrong
+            if ( room.SmartPlugIds ) {
+                room.SmartPlugIds.forEach( plugId => {
+                    roomMap[plugId] = {'roomId': room.id, 'roomName': room.Name, 'type': 'SmartPlug'}
+                })
+            }
+        })
+
+        //console.log('roomMap: ', roomMap)
+    }
 
     //#region ---- Public Functions ---- //
 
@@ -181,6 +233,10 @@ const Wiser = function() {
     const getFull = () => {
         return axios.get(servicePaths['full'], axiosConfig)
             .then( res => {
+                // Update the saved data and the room/device map
+                saved = res.data
+                doRoomMap()
+                // Return the data (as a Promise)
                 return res.data
             })
             .catch(error => {
@@ -193,12 +249,13 @@ const Wiser = function() {
         /** Get initial full data from Wiser Controller */
         getFull()
         .then( res => {
+            eventEmitter.emit('wiserPing', {'updated': new Date(), 'initialRun': true} )
 
             /** We are not interested in the controllers timestamp changes */
             delete res.System.UnixTime
             delete res.System.LocalDateAndTime
 
-            /** This is first run so just save a previous entry */
+            /** This is first run so just save a previous & current entry */
             prev = res
 
             /** Set up repeating call to get the full data from the Wiser Controller
@@ -227,12 +284,6 @@ const Wiser = function() {
                         delete res.System.UnixTime
                         delete res.System.LocalDateAndTime
 
-                        /** If prev variable is empty, just save a previous entry and exit */
-                        if ( !prev ) {
-                            prev = res
-                            return
-                        }
-
                         /** What has changed?
                          * @see https://www.npmjs.com/package/deep-object-diff#updateddiff
                          */
@@ -249,45 +300,55 @@ const Wiser = function() {
                                 delete data.PendingZigbeeMessageMask
 
                                 if (Object.values(data).length > 0 ) {
-                                    /**
-                                     * Data for wiserChange event.
-                                     *
+                                    /** Data for wiserChange event.
                                      * @type {object}
                                      * @property {Date} updated - JavaScript timestamp of the detection of the change
                                      * @property {string} type - The type of change (e.g. Device, Room, etc)
                                      * @property {string|number} idx - The index of the thing that has changed in the type array
                                      * @property {string|number} id - The ID of the thing that has changed
-                                     * @property {Object} data - The changed data
-                                     * @property {string} [name] - Room name (only for Room changes)
+                                     * @property {Object} changes - The changed settings:values
+                                     * @property {Object} prev - The previous settings:values
+                                     * @property {string} [room] - Room name (only for Room changes or devices where the room is known)
                                      */
                                     let changes = {
                                         'updated': new Date(), 
                                         'type': type, 
                                         'idx': i,
                                         'ID': res[type][i].id, 
-                                        'changes': data, 
+                                        'changes': data,
                                     }
-                                    if (type === 'Room') changes.name = res[type][i].Name
 
-                                    /**
-                                     * wiserChange event. Emitted after getting a full update from the controller when something has changed from the previous update.
-                                     *
+                                    /** Add in the previous matching settings */
+                                    let prevData = {}
+                                    Object.keys(data).forEach( chgProp => {
+                                        prevData[chgProp] = prev[type][i][chgProp]
+                                    })
+                                    changes.prev = prevData
+
+                                    /** Add in room name if available */
+                                    if (type === 'Room') changes.room = res[type][i].Name
+                                    else if ( roomMap[ res[type][i].id ] ) changes.room = roomMap[ res[type][i].id ].roomName
+
+                                    /** wiserChange event. Emitted after getting a full update from the controller when something has changed from the previous update.
                                      * @event wiserMonitor#wiserChange
                                      * @type {object}
                                      * @property {Date} updated - JavaScript timestamp of the detection of the change
                                      * @property {string} type - The type of change (e.g. Device, Room, etc)
                                      * @property {string|number} idx - The index of the thing that has changed in the type array
                                      * @property {string|number} id - The ID of the thing that has changed
-                                     * @property {Object} data - The changed data
-                                     * @property {string} [name] - Room name (only for Room changes)
+                                     * @property {Object} changes - The changed settings:values
+                                     * @property {Object} prev - The previous settings:values
+                                     * @property {string} [room] - Room name (only for Room changes or devices where the room is known)
                                      */
                                     eventEmitter.emit('wiserChange', changes)
                                 }
                             })
                         })
 
+                        /** Save the data */
                         prev = res
-                    })
+
+                    }) // --- end of getFull.then --- //
                     .catch( err => {
                         console.error(err)
                         /**
@@ -299,7 +360,7 @@ const Wiser = function() {
                          * @property {Object} error - The returned error object
                          */
                         eventEmitter.emit('wiserError', {'updated': new Date(), 'error': err} )
-                    })
+                    }) // --- end of getFull.catch --- //
 
             }, settings.interval * 1000 ) // --- End of setInterval --- //
 
@@ -331,6 +392,10 @@ const Wiser = function() {
         getFull,
         monitor,
         eventEmitter,
+        getRoom,
+        getRoomByName,
+        getRoomStat,
+        doRoomMap,
     }) // --- End of closure --- //
 
 } // ---- End of class ---- //
