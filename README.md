@@ -71,7 +71,7 @@ wiser.eventEmitter.on('wiserError', function(error) { // {'updated': new Date(),
 wiser.setConfig({
     ip: process.env.WISER_IP,
     secret: process.env.WISER_SECRET,
-    interval: 15,
+    interval: 60, // Only needed for the monitor function
 })
 
 /** Trigger the monitor function, use the event listeners to get output
