@@ -138,8 +138,29 @@ containing the latest data from the controller is not populated.
 #### getRoomStat
 #### doRoomMap
 
+### setRoomMode
+
+Set a specified room to a particular mode ('manual', 'set', 'boost', 'auto', 'off').
+
+* _Manual_: Turn off schedule and set to highest of boost Temperature and current scheduled setpoint
+* _Set_:    Set to boost temperature but leave schedule active, will reset on next scheduled change
+* _Boost_:  Boost to given temperature for given amount of time
+* _Off_:    Turn off schedule and set temperature to -200
+* _Auto_:   Return room to set schedule and current scheduled temperature
+
+Default boost setPoint for Boost, Manual and Set is (20°C)
+
 ## To Do
 
 * Add set functions
-* Add full output
-* Output added/deleted items not just updated.
+  * Started, setRoomMode is now available
+  
+* Add save/load schedule functions
+  
+  Allow save/load to/from file as well as to/from JSON
+
+* On change limit any boost/manual overrides (from real app) to a given max (stop people setting to silly temperatures)
+  
+* Reset all boosts/manual overrides at given time of day (stop people turning on boost when they go to bed!)
+
+* Output added/deleted items not just updated?
