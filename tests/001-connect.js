@@ -9,7 +9,7 @@ wiser.setConfig({
 //wiser.debug()
 //wiser.testConnection().then( d => {console.log('Connection OK?', d)})
 
-wiser.get('heating')
+wiser.get('test')
     .then( res => {
         if ( res.error ) {
             console.log('ERROR:', res.error)

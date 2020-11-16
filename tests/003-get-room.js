@@ -6,17 +6,17 @@ wiser.setConfig({
 })
 
 wiser.getFull()
-.then( fullData => {
-    //console.log(fullData)
+    .then( fullData => {
+        //console.log(fullData)
 
-    // let room = wiser.getRoom(1)    
-    // console.log( 'ROOM by id:', room )
+        let room = wiser.getRoom(100)    
+        console.log( 'ROOM by id:', room )
 
-    // room = wiser.getRoomByName('Bathroom ')    
-    // console.log( 'ROOM by name:', room )
+        // room = wiser.getRoomByName('Bathroom ')    
+        // console.log( 'ROOM by name:', room )
 
-    wiser.doRoomMap()
+        //wiser.doRoomMap()
 
-})
+    })
 
 

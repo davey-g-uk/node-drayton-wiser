@@ -42,7 +42,7 @@ wiser.eventEmitter.on('wiserError', function(error) { // {'updated': new Date(),
 wiser.setConfig({
     ip: process.env.WISER_IP,
     secret: process.env.WISER_SECRET,
-    interval: 60,
+    interval: 15,
 })
 //wiser.debug()
 //wiser.testConnection().then( d => {console.log('Connection OK?', d)})
