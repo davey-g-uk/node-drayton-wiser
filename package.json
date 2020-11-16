@@ -4,7 +4,9 @@
   "version": "0.1.0-dev",
   "main": "src/index.js",
   "scripts": {
-    "test": "npm run test002",
+    "start": "node --trace-warnings --inspect-brk tests/004-set-room-mode.js",
+    "test": "npm run test004",
+    "test004": "node tests/004-set-room-mode.js",
     "test003": "node tests/003-get-room.js",
     "test002": "node tests/002-full-compare.js",
     "test001": "node tests/001-connect.js"
