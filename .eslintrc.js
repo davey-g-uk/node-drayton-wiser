@@ -22,7 +22,7 @@ module.exports = {
     extends: [
         // use the recommended rule sets for javascript
         // 'eslint:recommended',
-        'plugin:prettier/recommended',
+        //'plugin:prettier/recommended',
     ],
     rules: {
         // we should always disable console logs and debugging in production
