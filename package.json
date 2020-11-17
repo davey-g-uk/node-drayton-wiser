@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node --trace-warnings --inspect-brk tests/004-set-room-mode.js",
-    "test": "npm run test004",
+    "test": "npm run test005",
+    "test005": "node tests/005-monitor-set.js",
     "test004": "node tests/004-set-room-mode.js",
     "test003": "node tests/003-get-room.js",
     "test002": "node tests/002-full-compare.js",
