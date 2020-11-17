@@ -90,13 +90,82 @@ Sets the configuration for connecting to your controller
 
 ### monitor
 
-Starts a repeating monitor that gets the full data from the controller.
+Starts a repeating monitor that gets the full data from the controller. Since the monitor uses the asynchronous features
+of JavaScript, it can be started and left running in your own script as shown in the example [above](#usage).
 
-In addition it fires one or more events as follows. Connect to `wiser.eventEmitter` to listen for the events (see [usage](#usage) above).
+#### Example use
 
-* `wiserPing`
-* `wiserChange`
-* `wiserError`
+```javascript
+const wiser = require('node-drayton-wiser')()
+
+wiser.eventEmitter.on('wiserPing', function(ts) {
+    console.log('wiserPing', ts)
+})
+
+wiser.eventEmitter.on('wiserChange', function(changes) {
+    console.log('wiserChange event:', changes )
+})
+wiser.eventEmitter.on('wiserError', function(error) {
+    console.log('wiserChange event:', error )
+})
+
+wiser.setConfig({
+    // Pass the IP and secret of the controller hub using environment variables
+    ip: process.env.WISER_IP,
+    secret: process.env.WISER_SECRET,
+    // Run the getFull() every 15s
+    interval: 15,
+})
+
+// Capture the setInterval reference from the monitor fn
+// so that it can be cancelled if required
+// Possible that multiple monitors have been started so we might
+// need to cancel them all.
+let refMonitor = 'test002'
+let wiserMonitorRefs = {}
+wiser.eventEmitter.on('wiserMonitorRef', function(ref) {
+    wiserMonitorRefs[ref.monitorRef] = ref.timeoutRef
+})
+
+wiser.monitor(refMonitor)
+
+setTimeout(() => {
+    console.warn('clearing monitors')
+
+    // Cancel automatically after 20s
+    clearInterval(wiserMonitorRefs[refMonitor])
+    delete wiserMonitorRefs[refMonitor]
+
+    // maybe restart the monitor as well?
+    // Of course, this will create an endless loop cancelling/restarting every 20s
+    // Change the reference name to prevent this
+    //wiser.monitor(refMonitor)
+}, 20000)
+```
+
+#### Output Events
+
+When a change is detected by the monitor it fires one or more events as follows. Connect to `wiser.eventEmitter` to listen for the events (see [usage](#usage) above).
+
+* `wiserPing` - Always emitted whenever the controller hub is successfully queried.
+* `wiserChange` - Emitted when a change is detected. May be emitted multiple times for each pass.
+* `wiserError` - Emitted when a connection to the controller fails or when the query fails.
+* `wiserMonitorRef` - Emitted when the monitor() function creates its setTimeout loop.
+
+#### Input Events
+
+While the monitor function is running, you can also send it events. The following event types are supported:
+
+* `setRoomMode` - Sets/cancels schedule overrides for the specified room.
+  
+  Must provide a data object that matches the parameters of the `[setRoomMode](#setroommode)` function.
+
+  Example use:
+
+  ```
+  ```
+
+* `` - 
 
 ### eventEmitter
 

@@ -93,9 +93,13 @@ const Wiser = function() {
      */
     let connectionOK = false
 
+    /** latest diff between new and previous full data used in monitor() */
     let dataDiff = {}
+    /** current full data - set in getFull() */
     let saved = undefined
+    /** previous full data - set in monitor() */
     let prev = undefined
+    /** current device-to-room map - rebuilt from getFull() in doRoomMap() */
     let roomMap = {}
 
     //#endregion ---- Private Variables ---- //
@@ -293,11 +297,21 @@ const Wiser = function() {
             })
     } // ---- end of getFull ---- //
 
-    const monitor = () => {
+    /** Start a monitoring loop. Get a full update every `interval` seconds
+     * @param {string} ref Unique reference string that will be returned with the wiserMonitorRef event so that a specific monitor can be cancelled
+     * @fires wiserMonitorRef - for every call of monitor(), from the setInterval
+     * @fires wiserGetFull#wiserPing - on every successful getFull()
+     * @fires wiserGetFull#wiserChange - if anything changes
+     * @fires wiserGetFull#wiserError - if getFull() errors
+     */
+    const monitor = (ref) => {
+        /** Reference to the setInterval instance from monitor() so that it can be cancelled */
+        let intervalFn = undefined
+
         /** Get initial full data from Wiser Controller */
         getFull()
             .then( res => {
-                eventEmitter.emit('wiserPing', {'updated': new Date(), 'initialRun': true} )
+                eventEmitter.emit('wiserPing', {'monitorRef': ref, 'updated': new Date(), 'initialRun': true} )
 
                 /** We are not interested in the controllers timestamp changes */
                 delete res.System.UnixTime
@@ -307,9 +321,9 @@ const Wiser = function() {
                 prev = res
 
                 /** Set up repeating call to get the full data from the Wiser Controller
-                 * Runs every `interval` milliseconds
+                 * Runs every `interval` seconds
                  */
-                setInterval(() => {
+                intervalFn = setInterval(() => {
                     
                     /** 
                      * Get full data from the Wiser Controller
@@ -318,15 +332,16 @@ const Wiser = function() {
                      * @fires wiserGetFull#wiserError
                     */
                     getFull()
-                    .then( res => {
+                        .then( res => {
                             /**
                              * wiserPing event. Emitted after getting a full update from the controller.
                              *
                              * @event wiserMonitor#wiserPing
                              * @type {object}
+                             * @property {string} monitorRef - Reference to specific instance of the monitor() fn
                              * @property {Date} updated - JavaScript timestamp of the detection of the change
                              */
-                            eventEmitter.emit('wiserPing', {'updated': new Date()} )
+                            eventEmitter.emit('wiserPing', {'monitorRef': ref, 'updated': new Date()} )
 
                             /** We are not interested in the controllers timestamp changes */
                             delete res.System.UnixTime
@@ -350,6 +365,7 @@ const Wiser = function() {
                                     if (Object.values(data).length > 0 ) {
                                         /** Data for wiserChange event.
                                          * @type {object}
+                                         * @property {string} monitorRef - Reference to specific instance of the monitor() fn
                                          * @property {Date} updated - JavaScript timestamp of the detection of the change
                                          * @property {string} type - The type of change (e.g. Device, Room, etc)
                                          * @property {string|number} idx - The index of the thing that has changed in the type array
@@ -359,6 +375,7 @@ const Wiser = function() {
                                          * @property {string} [room] - Room name (only for Room changes or devices where the room is known)
                                          */
                                         let changes = {
+                                            'monitorRef': ref,
                                             'updated': new Date(), 
                                             'type': type, 
                                             'idx': i,
@@ -404,14 +421,25 @@ const Wiser = function() {
                              *
                              * @event wiserMonitor#wiserError
                              * @type {object}
+                             * @property {string} monitorRef - Reference to specific instance of the monitor() fn
                              * @property {Date} updated - JavaScript timestamp of the detection of the change
                              * @property {Object} error - The returned error object
                              */
-                            eventEmitter.emit('wiserError', {'updated': new Date(), 'error': err} )
+                            eventEmitter.emit('wiserError', {'monitorRef': ref, 'updated': new Date(), 'error': err} )
                         }) // --- end of getFull.catch --- //
 
                 }, settings.interval * 1000 ) // --- End of setInterval --- //
 
+                /** Emit the setInterval reference so that the monitor can be cancelled
+                 *  from the calling process
+                 *
+                 * @event #wiserMonitorRef
+                 * @type {object}
+                 * @property {string} monitorRef - Reference to specific instance of the monitor() fn
+                 * @property {Timeout} timeoutRef - Reference to Timeout so that it can be cancelled
+                 */
+
+                eventEmitter.emit('wiserMonitorRef', {'monitorRef': ref, 'timeoutRef': intervalFn} )
             })
             .catch( err => {
                 console.error(err)
@@ -434,13 +462,16 @@ const Wiser = function() {
      * Boost:  Boost to given temperature for given amount of time
      * Off:    Turn off schedule and set temperature to -200
      * Auto:   Return room to set schedule and current scheduled temperature
-     * @param {number|string} roomIdOrName Room ID or Name to set
-     * @param {('manual'|'set'|'boost'|'off'|'auto')} mode Room mode (manual|set|boost|off|auto)
-     * @param {number} [boostTemp] Temperature SetPoint for boost mode (°C, min=5, max=30). Optional, default 20
-     * @param {number} [boostDuration] Duration for boost mode (minutes). Optional, default 30min
+     * @param {Object} args Object containing the arguments - uses JS destructuring so needs node.js 10.9+
+     * @param {number|string} args.roomIdOrName Room ID or Name to set
+     * @param {('manual'|'set'|'boost'|'off'|'auto')} args.mode Room mode (manual|set|boost|off|auto)
+     * @param {number} [args.boostTemp] Temperature SetPoint for boost mode (°C, min=5, max=30). Optional, default 20
+     * @param {number} [args.boostDuration] Duration for boost mode (minutes). Optional, default 30min
      * @return {boolean} TRUE if successful, FALSE if not
      */
-    const setRoomMode = (roomIdOrName, mode, boostTemp=BOOST_DEFAULT_TEMP, boostDuration=BOOST_DEFAULT_DURATION) => {
+    const setRoomMode = ({roomIdOrName, mode, boostTemp=BOOST_DEFAULT_TEMP, boostDuration=BOOST_DEFAULT_DURATION}) => {
+
+        console.log('setRoomMode:', {roomIdOrName, mode, boostTemp, boostDuration})
 
         getFull()
             .then( fullData => {
@@ -580,6 +611,16 @@ const Wiser = function() {
     }
 
     //#endregion ---- Public Functions ---- //
+
+    //#region ---- Built-in event listeners ---- //
+
+    /** Listen for setRoomMode event and calls setRoomMode fn on receipt */
+    eventEmitter.on('setRoomMode', function(roomOpts) {
+        //console.log('EVENT Listener: setRoomMode: ', roomOpts)
+        setRoomMode(roomOpts)
+    }) // --- End of on:setRoomMode --- //
+
+    //#endregion ---- Built-in event listeners ---- //
 
     /** Closure pattern - only expose what we want to, uses object deconstruction */
     return ({

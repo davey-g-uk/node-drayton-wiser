@@ -47,4 +47,27 @@ wiser.setConfig({
 //wiser.debug()
 //wiser.testConnection().then( d => {console.log('Connection OK?', d)})
 
-wiser.monitor()
+// Capture the setInterval reference from the monitor fn
+// so that it can be cancelled if required
+// Possible that multiple monitors have been started so we might
+// need to cancel them all.
+let refMonitor = 'test002'
+let wiserMonitorRefs = {}
+wiser.eventEmitter.on('wiserMonitorRef', function(ref) {
+    wiserMonitorRefs[ref.monitorRef] = ref.timeoutRef
+})
+
+wiser.monitor(refMonitor)
+
+setTimeout(() => {
+    console.warn('clearing monitors')
+
+    // Cancel automatically after 20s
+    clearInterval(wiserMonitorRefs[refMonitor])
+    delete wiserMonitorRefs[refMonitor]
+
+    // maybe restart the monitor as well?
+    // Of course, this will create an endless loop cancelling/restarting every 20s
+    // Change the reference name to prevent this
+    //wiser.monitor(refMonitor)
+}, 20000)
