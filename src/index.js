@@ -379,7 +379,7 @@ const Wiser = function() {
                                             'updated': new Date(), 
                                             'type': type, 
                                             'idx': i,
-                                            'ID': res[type][i].id, 
+                                            'id': res[type][i].id, 
                                             'changes': data,
                                         }
 
