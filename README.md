@@ -233,3 +233,5 @@ Default boost setPoint for Boost, Manual and Set is (20°C)
 * Reset all boosts/manual overrides at given time of day (stop people turning on boost when they go to bed!)
 
 * Output added/deleted items not just updated?
+  
+* Add default ref name to monitor function
