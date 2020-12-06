@@ -57,7 +57,7 @@ function runTest() {
         ip: process.env.WISER_IP,
         secret: process.env.WISER_SECRET,
         interval: 15,
-        maxBoost: 19,
+        maxBoost: 22,
     })
 
 
@@ -71,9 +71,9 @@ function runTest() {
 
         // Manual override, boost for 60 minutes
         wiser.eventEmitter.emit('setRoomMode',{
-            roomIdOrName: 11, // Office
-            mode: 'auto',
-            //boostTemp: 19.5, 
+            roomIdOrName: 'Office',
+            mode: 'boost',
+            //boostTemp: 19.5, // optional for 'boost'
             boostDuration: 60,
         })
 

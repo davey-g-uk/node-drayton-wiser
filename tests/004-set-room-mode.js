@@ -5,7 +5,7 @@ function runTest() {
     const wiserConfig = {
         ip: process.env.WISER_IP,
         secret: process.env.WISER_SECRET,
-        maxBoost: 19,
+        maxBoost: 22,
     }
     wiser.setConfig(wiserConfig)
 
@@ -22,9 +22,9 @@ function runTest() {
      *  Boost Office temperature for 60 minutes.
      */
     wiser.eventEmitter.emit('setRoomMode',{
-        roomIdOrName: 11, // Office
-        mode: 'auto',
-        //boostTemp: 19.5, 
+        roomIdOrName: 'Office',
+        mode: 'boost',
+        boostTemp: 21.5, // optional for 'boost'
         boostDuration: 60,
     })
 
@@ -42,12 +42,12 @@ function runTest() {
         console.error('Test 004b - Office, bingo - FAILED - This is correct (invalid mode):', err)
     })
 
-    // Manual override, attempt 19.8, will auto-reset to 19 (see settings above)
-    wiser.setRoomMode('Office','set', 19.8).then( data => {
+    // Manual override, attempt 22.8, will auto-reset to 22 (see settings above)
+    wiser.setRoomMode('Office','set', 22.8).then( data => {
         //console.assert( data.lastResult.Mode === 'Auto', `Result should be "Auto" not ${data.lastResult.Mode}` )
-        console.info('Test 004c - Office, 19.8 - WORKED, this is correct BUT max temp should be 19.0 (should also see a warning msg):', data)
+        console.info('Test 004c - Office, 22.8 - WORKED, this is correct BUT max temp should be 19.0 (should also see a warning msg):', data)
     }).catch( err => {
-        console.error('Test 004c - Office, 19.8 - FAILED, it should have worked:', err)
+        console.error('Test 004c - Office, 22.8 - FAILED, it should have worked:', err)
     })
 
     // wiser.setRoomMode('Office','auto').then( data => {
