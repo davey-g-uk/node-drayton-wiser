@@ -41,6 +41,10 @@ const BOOST_DEFAULT_TEMP = 20
  * @type {number}
  */
 const BOOST_DEFAULT_DURATION = 30
+/** Default monitor loop interval (seconds)
+ * @type {number}
+ */
+const MONITOR_LOOP_INTERVAL = 60
 
 /** Closure to access a Drayton Wiser controller API
  * Use as `const Wiser = require('node-drayton-wiser'); const wiser = new Wiser({ip:process.env.WISER_IP,secret:process.env.WISER_SECRET})`
@@ -70,7 +74,19 @@ const Wiser = function() {
         /** Interval between calls to get the full Controller data and calculate diffs
          * @type {number} Integer seconds
          */
-        interval: 60,
+        interval: MONITOR_LOOP_INTERVAL,
+        /** Filing system folder to use for schedule files. Defaults to current working folder (cwd)
+         * @type {string}
+         */
+        folder: '',
+        /** Max temperature (°C) allowed for boost/manual temperatures
+         * @type {number}
+         */
+        maxBoost: BOOST_DEFAULT_TEMP,
+        /** Time at which all overrides will be cancelled (daily) "HH:mm" (24hr)
+         * @type {string|null}
+         */
+        boostCancelTime: null,
     }
 
     /** Default configuration for Axios promised-based http request handler
@@ -101,6 +117,8 @@ const Wiser = function() {
     let prev = undefined
     /** current device-to-room map - rebuilt from getFull() in doRoomMap() */
     let roomMap = {}
+    /** Track started monitors */
+    let wiserMonitorRefs = {}
 
     //#endregion ---- Private Variables ---- //
 
@@ -139,17 +157,35 @@ const Wiser = function() {
     const getRoom = (roomId) => {
         //console.log('SAVED:', Object.keys(saved))
         //console.log('SAVED #rooms:', saved.Room.length)
-        return saved.Room.filter( room => {
+        let rooms = []
+        rooms = saved.Room.filter( room => {
             return room.id === roomId
-        })[0]
+        })
+        if ( rooms.length < 1 ) {
+            console.warn(`[node-drayton-wiser:getRoom] Room ID ${roomId} not found.`)
+            return null
+        }
+        if ( rooms.length > 1 ) {
+            console.warn(`[node-drayton-wiser:getRoom] Room ID ${roomId} not unique! ${rooms.length} found.`)
+        }
+        // Only return the first entry
+        return rooms[0]
     }
 
     const getRoomByName = (roomName) => {
-        //console.log('SAVED:', Object.keys(saved))
-        //console.log('SAVED #rooms:', saved.Room.length)
-        return saved.Room.filter( room => {
+        let rooms = []
+        rooms = saved.Room.filter( room => {
             return room.Name === roomName
-        })[0]
+        })
+        if ( rooms.length < 1 ) {
+            console.warn(`[node-drayton-wiser:getRoom] Room name --${roomName}-- not found.`)
+            return null
+        }
+        if ( rooms.length > 1 ) {
+            console.warn(`[node-drayton-wiser:getRoom] Room name --${roomName}-- not unique! ${rooms.length} found.`)
+        }
+        // Only return the first entry
+        return rooms[0]
     }
 
     const getRoomStat = (roomStatId) => {
@@ -158,6 +194,18 @@ const Wiser = function() {
 
     const getTRV = (trvid) => {
         
+    }
+
+    /** Return the refs for a given monitor name or return undefined if not found
+     * @param {string} refName Name of the monitor reference to search for
+     * @return {Object|undefined} Either undefined or a reference to the setInterval fn
+     */
+    const getMonitorRef = (refName) => {
+        try{
+            return wiserMonitorRefs[refName]
+        } catch {
+            return undefined
+        }
     }
 
     /** Rebuild the roommap (device id => room) */
@@ -215,28 +263,84 @@ const Wiser = function() {
         return fin
     }
 
-    /** Set the configuration to be used
-     * @param {Object} config IP address and API secret key of controller
+    /** Set the initial configuration to be used
+     * @param {Object} config IP address and API secret key of controller + other settings if needed
+     * --- These HAVE to be set up front and cannot be changed later ---
      * @param {string} config.ip IP address of Wiser controller
      * @param {string} config.secret API secret key for accessing the controller
      * @param {number} [config.interval] Optional. Scan interval in seconds. Defaults to 60s
+     * --- The remainder can be set on initial settings or subsequently (see the setXxxx functions) ---
+     * @param {string} [config.folder] Optional. Filing system folder to use for schedule files. Defaults to current working folder (cwd)
+     * @param {number} [config.maxBoost] Optional. Max temperature (°C) allowed for boost/manual temperatures
+     * @param {string|null} [config.boostCancelTime] Optional. Time at which all overrides will be cancelled (daily) "HH:mm" (24hr)
      */
-    const setConfig = ({ip, secret, interval=settings.interval}) => {
+    const setConfig = ({ip, secret, interval=settings.interval, folder=undefined, maxBoost=undefined, boostCancelTime=undefined}) => {
         //console.log({ip, secret, interval})
 
+        // must both be provided
         if (!ip || !secret) {
             //console.error('[node-drayton-wiser] both IP and SECRET must be provided')
             console.log({ip, secret, interval})
             throw Error ('[node-drayton-wiser] both IP and SECRET must be provided')
         }
 
-        if (typeof interval === 'number') settings.interval = interval
+        if (typeof interval === 'number' && isFinite(interval) ) settings.interval = interval
         else console.warn('[node-drayton-wiser] interval config ignored, it must be a number')
 
         axiosConfig.baseURL = `http://${ip}`
         axiosConfig.headers.SECRET = secret
 
+        // Validate maxBoost & save to settings
+        if ( folder ) setFolder(folder)
+        if ( maxBoost ) setMaxBoost(maxBoost)
+        if ( boostCancelTime ) setBoostCancelTime(boostCancelTime)
+
     } // --- End of setConfig --- //
+
+    const setFolder = (folder='') => {
+        //TODO check for valid folder name
+        if ( folder === '' ) folder = process.cwd()
+        settings.folder = folder
+        return folder
+    }
+
+    const setMaxBoost = (maxBoost=TEMP_MAXIMUM) => {
+        // Validate maxBoost & save to settings
+        if ( typeof maxBoost === 'number' && isFinite(maxBoost) ) {
+            if ( maxBoost > TEMP_MAXIMUM ) {
+                maxBoost = TEMP_MAXIMUM
+                console.warn(`[node-drayton-wiser:setMaxBoost] maxBoost set too high, changed to TEMP_MAX (${TEMP_MAXIMUM}°C)`)
+            }
+            settings.maxBoost = maxBoost
+            return maxBoost
+        } else {
+            console.warn(`[node-drayton-wiser:setMaxBoost] maxBoost not a valid number. Ignored. --${maxBoost}--`)
+            return null
+        }
+    }
+
+    const setBoostCancelTime = (boostCancelTime=null) => {
+        if ( boostCancelTime === null ) {
+            settings.boostCancelTime = null
+            return null
+        }
+        
+        // Check that the input is a valid time
+        /** @type {boolean|regex} */ 
+        let result = false, m
+        const re = /^\s*([01]?\d|2[0-3]):?([0-5]\d)\s*$/
+        if ((m = boostCancelTime.match(re))) {
+            result = (m[1].length === 2 ? '' : '0') + m[1] + ':' + m[2];
+        }
+
+        if ( result === false ) {
+            console.warn(`[node-drayton-wiser:setBoostCancelTime] boostCancelTime not a valid time ("HH:mm"). Ignored. --${boostCancelTime}--`)
+            return false
+        } else {
+            settings.boostCancelTime = result
+            return result
+        }
+    }
 
     /** Output debugging info
      * @param {boolean} [doDebug] Output debugging info to console. Optional, default=false
@@ -253,49 +357,62 @@ const Wiser = function() {
         let out = {}
 
         if ( !ServiceNames.includes(service) ) {
-            console.error(`[node-drayton-wiser] Invalid service name: ${service}, must be one of: [${ServiceNames.join(', ')}]`)
-            out[service] = undefined
-            return out
+            return Promise.reject({
+                'error': `[node-drayton-wiser:get] Invalid service name: ${service}, must be one of: [${ServiceNames.join(', ')}]`
+            })
         }
 
         if (!axiosConfig.baseURL || !axiosConfig.headers.SECRET) {
-            throw Error ('[node-drayton-wiser] both IP and SECRET must be provided before testing the connection, call setConfig first')
+            return Promise.reject({
+                'error': '[node-drayton-wiser:get] both IP and SECRET must be provided before testing the connection, call setConfig first'
+            })
         }
 
         // Make a request
-        const fin =  axios.get(servicePaths[service], axiosConfig)
-            .then(function (response) {
-                connectionOK = true
-                out[service] = response.data
-                return out
-            })
-            .catch(function (error) {
-                connectionOK = true
-                //console.error(error)
-                //console.warn(`SERVICE: ${service}, PATH: ${servicePaths[service]}`)
-                //return error
-                return wiserErrorResult(error, service)
-            })
-                
-        return fin
-
-    }
+        let result = await axios.get(servicePaths[service], axiosConfig)
+        out[service] = result.data
+        return  out
+    } // --- End of get() --- //
 
     /** Get the full  */
-    const getFull = () => {
-        return axios.get(servicePaths['full'], axiosConfig)
-            .then( res => {
-                // Update the saved data and the room/device map
-                saved = res.data
-                doRoomMap()
-                // Return the data (as a Promise)
-                return res.data
-            })
-            .catch(error => {
-                console.error(error)
-                return {'error': error}
-            })
+    const getFull = async () => {
+        try {
+            const result = await axios.get(servicePaths['full'], axiosConfig)
+            // Update the saved data and the room/device map
+            saved = result.data
+            doRoomMap()
+            return saved
+        } catch (error) {
+            console.error(error)
+            return {'error': error}
+        }
+
+
+            // .then( res => {
+            //     // Update the saved data and the room/device map
+            //     saved = res.data
+            //     doRoomMap()
+            //     // Return the data (as a Promise)
+            //     return res.data
+            // })
+            // .catch(error => {
+            //     console.error(error)
+            //     return {'error': error}
+            // })
     } // ---- end of getFull ---- //
+
+    /** Remove an existing monitor if it exists (does not error if it doesn't exist)
+     * @param {string} ref Unique reference string that will be returned with the wiserMonitorRef event so that a specific monitor can be cancelled
+     * @fires wiserMonitorRemoved - If the referenced monitor existed and has been successfully deleted
+     */
+    const removeMonitor = (ref) => {
+        const existRef = getMonitorRef(ref)
+        if (existRef !== undefined) {
+            clearInterval(existRef)
+            delete wiserMonitorRefs[ref]
+            eventEmitter.emit('wiserMonitorRemoved', {'monitorRef': ref} )
+        }
+    }
 
     /** Start a monitoring loop. Get a full update every `interval` seconds
      * @param {string} ref Unique reference string that will be returned with the wiserMonitorRef event so that a specific monitor can be cancelled
@@ -304,9 +421,12 @@ const Wiser = function() {
      * @fires wiserGetFull#wiserChange - if anything changes
      * @fires wiserGetFull#wiserError - if getFull() errors
      */
-    const monitor = (ref) => {
+    const monitor = (ref='wiser') => {
         /** Reference to the setInterval instance from monitor() so that it can be cancelled */
         let intervalFn = undefined
+
+        // If the monitor already exists, cancel it so that it can be recreated
+        removeMonitor(ref)
 
         /** Get initial full data from Wiser Controller */
         getFull()
@@ -467,146 +587,182 @@ const Wiser = function() {
      * @param {('manual'|'set'|'boost'|'off'|'auto')} args.mode Room mode (manual|set|boost|off|auto)
      * @param {number} [args.boostTemp] Temperature SetPoint for boost mode (°C, min=5, max=30). Optional, default 20
      * @param {number} [args.boostDuration] Duration for boost mode (minutes). Optional, default 30min
-     * @return {boolean} TRUE if successful, FALSE if not
+     * @return {Promise} 
      */
-    const setRoomMode = ({roomIdOrName, mode, boostTemp=BOOST_DEFAULT_TEMP, boostDuration=BOOST_DEFAULT_DURATION}) => {
+    const setRoomMode = async (roomIdOrName, mode, boostTemp=BOOST_DEFAULT_TEMP, boostDuration=BOOST_DEFAULT_DURATION) => {
 
-        console.log('setRoomMode:', {roomIdOrName, mode, boostTemp, boostDuration})
+        //console.log('setRoomMode params:', {roomIdOrName, mode, boostTemp, boostDuration})
 
-        getFull()
-            .then( fullData => {
-                //console.log(fullData)
+        // Allow params to be passed as settings object
+        if ( roomIdOrName !== null && roomIdOrName.constructor.name === "Object" ) {
+            if ( roomIdOrName.mode ) mode = roomIdOrName.mode
+            else mode = undefined
 
-                /** Data to send to controller hub */
-                const patchData = {}
-                /** URLs for patches - Array since we might have 2 patches to send */
-                const patches = []
+            if ( roomIdOrName.boostTemp ) mode = roomIdOrName.boostTemp
+            if ( roomIdOrName.boostDuration ) boostDuration = roomIdOrName.boostDuration
 
-                let room
+            if ( roomIdOrName.roomIdOrName ) roomIdOrName = roomIdOrName.roomIdOrName
+            else roomIdOrName = undefined
+        }
 
-                // If room name given, find the ID
-                if ( Number.isNaN( Number(roomIdOrName) ) ) {
-                    room = getRoomByName(roomIdOrName)
+        if ( roomIdOrName === undefined || roomIdOrName === '' || roomIdOrName === null ) {
+            return Promise.reject({
+                'error': `[noode-drayton-wiser:setRoomMode] Room ID or Name is invalid: --${roomIdOrName}--`
+            })
+        }
 
-                } else {
-                    room = getRoom(Number(roomIdOrName))
-                }
+        if ( mode === undefined || mode === '' || mode === null ) {
+            return Promise.reject({
+                'error': `[noode-drayton-wiser:setRoomMode] Mode is not provided for room: ${roomIdOrName}.`
+            })
+        }
 
-                if (room === undefined) {
-                    console.warn('[node-drayton-wiser:setRoomMode] Invalid room id or name provided, ignoring.', `-${roomIdOrName}-`)
-                    return false
-                }
+        try {
+            let result = await getFull()
+        } catch (error) {
+            return Promise.reject({
+                'error': `[node-drayton-wiser:setRoomMode] Get Full failed.`,
+                'details': error, //wiserErrorResult(error, 'full'),
+            })
+        }
 
-                let roomUrl = `${servicePaths['rooms']}${room.id}`
-                
-                // Limit temperature requests (must be 5-30 °C or -200=off)
-                if ( (boostTemp < TEMP_MINIMUM) || (boostTemp > TEMP_MAXIMUM) ) {
-                    if ( boostTemp !== -200 ) boostTemp = BOOST_DEFAULT_TEMP
-                }
-
-                switch (mode.toLowerCase()) {
-                    case 'manual': {
-                        // Use highest of boost temp or current sch setpoint. Sch will not reset
-
-                        // Set to manual mode first otherwise next sch chg would override
-                        patches.push( axios.patch(roomUrl, {'Mode': 'Manual'}, axiosConfig) )
-                        
-                        // setPoint is highest of boostTemp and the current room scheduled setpoint
-                        let setPoint = toWiserTemp(boostTemp)
-                        if ( room.ScheduledSetPoint > toWiserTemp(boostTemp) ) setPoint = room.ScheduledSetPoint
-
-                        patchData.RequestOverride = {
-                            'Type': 'Manual',
-                            'SetPoint': setPoint,
-                        }
-
-                        break
-                    }
-
-                    case 'set': {
-                        // Use boost temp and allow next schedule change to reset
-                        
-                        patchData.RequestOverride = {
-                            'Type': 'Manual',
-                            'SetPoint': toWiserTemp(boostTemp),
-                        }
-
-                        break
-                    }
-
-                    case 'boost': {
-                        patchData.RequestOverride = {
-                            'Type': 'Manual',
-                            'DurationMinutes': boostDuration,
-                            'SetPoint': toWiserTemp(boostTemp),
-                            //'SetpointOrigin': 'FromBoost',
-                            'Originator': 'App',
-                        }
-
-                        break
-                    }
-                    
-                    case 'off': {
-                        // Set to manual mode first so as to prevent next schedule change overriding
-                        patches.push( axios.patch(roomUrl, {'Mode': 'Manual'}, axiosConfig) )
-
-                        patchData.RequestOverride = {
-                            'Type': 'Manual',
-                            'SetPoint': toWiserTemp(TEMP_OFF),
-                        }
-
-                        break
-                    }
-                    
-                    case 'auto': {
-                        patchData.Mode = 'Auto'
-
-                        break
-                    }
-                
-                    default: {
-                        console.warn('[node-drayton-wiser:setRoomMode] Invalid mode name provided, ignoring.')
-                        return false
-                        break
-                    }
-                }
-
-                // If not boost mode, cancel any boost by setting override to none
-                if ( mode.toLowerCase() !== 'boost' ) {
-                    let cancelBoostPatchData = {
-                        'RequestOverride': {
-                            'Type': 'None',
-                            'DurationMinutes': 0,
-                            'SetPoint': 0,
-                            'Originator': 'App',
-                        }
-                    }
-                    // push to patches
-                    patches.push( axios.patch(roomUrl, cancelBoostPatchData, axiosConfig) )
-                }
-
-                // push main request to patches
-                patches.push( axios.patch(roomUrl, patchData, axiosConfig) )
-
-                // Set mode
-                axios.all(patches)
-                    .then( res => {
-                        console.log('# Results:', res.length)
-                        // Only show the last result (the actual change)
-                        console.log('Final Result:', res[res.length-1].data, res[res.length-1].config.data)
-                    })
-                    .catch( err => {
-                        console.log( wiserErrorResult(err, 'patches') )
-                        return false
-                    })
-
-                return true
         
+        /** Data to send to controller hub */
+        const patchData = {}
+        /** URLs for patches - Array since we might have 2 patches to send */
+        const patches = []
+
+        let room
+
+        // If room name given, find the ID
+        if ( Number.isNaN( Number(roomIdOrName) ) ) {
+            room = getRoomByName(roomIdOrName)
+        } else {
+            room = getRoom(Number(roomIdOrName))
+        }
+
+        if ( room === undefined || room === null ) {
+            return Promise.reject({
+                'error': `[node-drayton-wiser:setRoomMode] Invalid room id or name provided (${roomIdOrName}).`
             })
-            .catch(err => {
-                console.log( wiserErrorResult(err, 'full') )
-                return false
+        }
+
+        let roomUrl = `${servicePaths['rooms']}${room.id}`
+        
+        // Limit temperature requests (must be 5-30 °C or -200=off)
+        if ( boostTemp !== -20 ) {
+            if ( (boostTemp < TEMP_MINIMUM) ) {
+                console.info(`[node-drayton-wiser:setRoomMode] Requested temperature too low (${boostTemp}), setting to default minimum (${TEMP_MINIMUM}) for room: ${roomIdOrName}.`)
+                boostTemp = TEMP_MINIMUM
+            }
+            if ( boostTemp > settings.maxBoost ) {
+                console.info(`[node-drayton-wiser:setRoomMode] Requested temperature too high (${boostTemp}), setting to max. allowed (${settings.maxBoost}) for room: ${roomIdOrName}.`)
+                boostTemp = settings.maxBoost
+            }
+        }
+
+        switch (mode.toLowerCase()) {
+            case 'manual': {
+                // Use highest of boost temp or current sch setpoint. Sch will not reset
+
+                // Set to manual mode first otherwise next sch chg would override
+                patches.push( axios.patch(roomUrl, {'Mode': 'Manual'}, axiosConfig) )
+                
+                // setPoint is highest of boostTemp and the current room scheduled setpoint
+                let setPoint = toWiserTemp(boostTemp)
+                if ( room.ScheduledSetPoint > toWiserTemp(boostTemp) ) setPoint = room.ScheduledSetPoint
+
+                patchData.RequestOverride = {
+                    'Type': 'Manual',
+                    'SetPoint': setPoint,
+                }
+
+                break
+            }
+
+            case 'set': {
+                // Use boost temp and allow next schedule change to reset
+                
+                patchData.RequestOverride = {
+                    'Type': 'Manual',
+                    'SetPoint': toWiserTemp(boostTemp),
+                }
+
+                break
+            }
+
+            case 'boost': {
+                patchData.RequestOverride = {
+                    'Type': 'Manual',
+                    'DurationMinutes': boostDuration,
+                    'SetPoint': toWiserTemp(boostTemp),
+                    //'SetpointOrigin': 'FromBoost',
+                    'Originator': 'App',
+                }
+
+                break
+            }
+            
+            case 'off': {
+                // Set to manual mode first so as to prevent next schedule change overriding
+                patches.push( axios.patch(roomUrl, {'Mode': 'Manual'}, axiosConfig) )
+
+                patchData.RequestOverride = {
+                    'Type': 'Manual',
+                    'SetPoint': toWiserTemp(TEMP_OFF),
+                }
+
+                break
+            }
+            
+            case 'auto': {
+                patchData.Mode = 'Auto'
+
+                break
+            }
+        
+            default: {
+                return Promise.reject({
+                    'error': `[node-drayton-wiser:setRoomMode] Invalid mode provided (${mode}) for room: ${roomIdOrName}. Must be one of ['manual','set','boost','off','auto']`
+                })
+                break
+            }
+        }
+
+        // If not boost mode, cancel any boost by setting override to none
+        if ( mode.toLowerCase() !== 'boost' ) {
+            let cancelBoostPatchData = {
+                'RequestOverride': {
+                    'Type': 'None',
+                    'DurationMinutes': 0,
+                    'SetPoint': 0,
+                    'Originator': 'App',
+                }
+            }
+            // push to patches
+            patches.push( axios.patch(roomUrl, cancelBoostPatchData, axiosConfig) )
+        }
+
+        // push main request to patches
+        patches.push( axios.patch(roomUrl, patchData, axiosConfig) )
+
+        // Set mode
+        try {
+            let res = await axios.all(patches)
+            // console.log('# Results:', res.length)
+            // Only show the last result (the actual change)
+            // console.log('Final Result:', res[res.length-1].data, res[res.length-1].config.data)
+            return Promise.resolve({
+                'numResults': res.length,
+                'lastResult': res[res.length-1].data,
+                'lastConfigResult': res[res.length-1].config.data,
             })
+        } catch (err) {
+            return Promise.reject({
+                'error': `[node-drayton-wiser:setRoomMode] Send to controller failed.`,
+                'details': err, //wiserErrorResult(err, 'patches'),
+            })
+        }
 
     }
 
@@ -620,6 +776,12 @@ const Wiser = function() {
         setRoomMode(roomOpts)
     }) // --- End of on:setRoomMode --- //
 
+    /** Listen for a new monitor starting and save the reference to it and its timer */
+    eventEmitter.on('wiserMonitorRef', function(ref) {
+        // node.log('ref', ref)
+        wiserMonitorRefs[ref.monitorRef] = ref.timeoutRef
+    })
+
     //#endregion ---- Built-in event listeners ---- //
 
     /** Closure pattern - only expose what we want to, uses object deconstruction */
@@ -630,6 +792,7 @@ const Wiser = function() {
         testConnection,
         get,
         getFull,
+        removeMonitor,
         monitor,
         eventEmitter,
         getRoom,
@@ -637,6 +800,9 @@ const Wiser = function() {
         getRoomStat,
         doRoomMap,
         setRoomMode,
+        setMaxBoost,
+        setBoostCancelTime,
+        setFolder,
     }) // --- End of closure --- //
 
 } // ---- End of class ---- //
