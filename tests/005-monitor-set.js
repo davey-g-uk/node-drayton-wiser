@@ -6,10 +6,10 @@ function runTest() {
 
     /** Listen for ping events from all monitors
      * @listens node-drayton-wiser:wiserMonitor#wiserPing
-     * @param {number} ts Timestamp (ISO string) of the ping
+     * @param {Object} pingData Timestamp (ISO string), name and initial run flag of the ping
      */
-    wiser.eventEmitter.on('wiserPing', function(ts) {
-        console.info('Test 005 - monitor - wiserPing event - timestamp:', ts)
+    wiser.eventEmitter.on('wiserPing', function(pingData) {
+        console.info('Test 005 - monitor - wiserPing event - timestamp:', pingData)
     })
 
     /** Listens for change events from all monitors
