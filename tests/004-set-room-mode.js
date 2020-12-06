@@ -45,7 +45,7 @@ function runTest() {
     // Manual override, attempt 22.8, will auto-reset to 22 (see settings above)
     wiser.setRoomMode('Office','set', 22.8).then( data => {
         //console.assert( data.lastResult.Mode === 'Auto', `Result should be "Auto" not ${data.lastResult.Mode}` )
-        console.info('Test 004c - Office, 22.8 - WORKED, this is correct BUT max temp should be 19.0 (should also see a warning msg):', data)
+        console.info('Test 004c - Office, 22.8 - WORKED, this is correct BUT max temp should be 22.0 (should also see a warning msg):', data)
     }).catch( err => {
         console.error('Test 004c - Office, 22.8 - FAILED, it should have worked:', err)
     })
