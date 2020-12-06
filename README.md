@@ -104,8 +104,8 @@ of JavaScript, it can be started and left running in your own script as shown in
 ```javascript
 const wiser = require('node-drayton-wiser')()
 
-wiser.eventEmitter.on('wiserPing', function(ts) {
-    console.log('wiserPing', ts)
+wiser.eventEmitter.on('wiserPing', function(pingData) {
+    console.log('wiserPing', pingData)
 })
 
 wiser.eventEmitter.on('wiserChange', function(changes) {
@@ -115,41 +115,45 @@ wiser.eventEmitter.on('wiserError', function(error) {
     console.log('wiserChange event:', error )
 })
 
+// Set configuration
 wiser.setConfig({
     // Pass the IP and secret of the controller hub using environment variables
     ip: process.env.WISER_IP,
     secret: process.env.WISER_SECRET,
-    // Run the getFull() every 15s
+    // Run the getFull() every 15s (otherwise, defaults to 60s)
     interval: 15,
+    // Max temp (°C) allowed for boost/manual override (defaults to max allowed temp of 30°C)
+    maxBoost: 19,
 })
 
-// Capture the setInterval reference from the monitor fn
-// so that it can be cancelled if required
-// Possible that multiple monitors have been started so we might
-// need to cancel them all.
-let refMonitor = 'test002'
-let wiserMonitorRefs = {}
-wiser.eventEmitter.on('wiserMonitorRef', function(ref) {
-    wiserMonitorRefs[ref.monitorRef] = ref.timeoutRef
-})
-
+// Start the monitor loop and event emitters
+// Note that running again with the same monitor name will restart the monitor
+// It takes 2 intervals before any change events are registered.
 wiser.monitor(refMonitor)
 
+// Example of stopping the monitor after 60 seconds
 setTimeout(() => {
     console.warn('clearing monitors')
 
     // Cancel automatically after 20s
-    clearInterval(wiserMonitorRefs[refMonitor])
-    delete wiserMonitorRefs[refMonitor]
-
-    // maybe restart the monitor as well?
-    // Of course, this will create an endless loop cancelling/restarting every 20s
-    // Change the reference name to prevent this
-    //wiser.monitor(refMonitor)
-}, 20000)
+    wiser.removeMonitor(refMonitor)
+}, 60000)
 ```
 
-#### Output Events
+### removeMonitor('monitorName')
+
+Remove (cancel) the specified monitor.
+
+### eventEmitter
+
+The Node.js event emmitter used for firing and listening to events from the module.
+
+See the examples given above in the [monitor](#monitor) section for details.
+Also see the `tests` folder.
+
+#### Output Events - monitor
+
+The events are only output by the monitor function. They should not be output by anything else.
 
 When a change is detected by the monitor it fires one or more events as follows. Connect to `wiser.eventEmitter` to listen for the events (see [usage](#usage) above).
 
@@ -158,24 +162,120 @@ When a change is detected by the monitor it fires one or more events as follows.
 * `wiserError` - Emitted when a connection to the controller fails or when the query fails.
 * `wiserMonitorRef` - Emitted when the monitor() function creates its setTimeout loop.
 
+#### Output Events - other
+
+* `wiserMonitorRemoved` - Output if a monitor is restarted or if the `[removeMonitor](#removemonitor)` function is called.
 #### Input Events
 
-While the monitor function is running, you can also send it events. The following event types are supported:
+The module also automatically listens for the following events:
 
 * `setRoomMode` - Sets/cancels schedule overrides for the specified room.
   
-  Must provide a data object that matches the parameters of the `[setRoomMode](#setroommode)` function.
+  Must provide a data object that matches the parameter object of the `[setRoomMode](#setroommode)` function.
 
   Example use:
 
+  ```javascript
+    const wiser = require('node-drayton-wiser')()
+
+    const wiserConfig = {
+        ip: process.env.WISER_IP,
+        secret: process.env.WISER_SECRET,
+        maxBoost: 22,
+    }
+    wiser.setConfig(wiserConfig)
+
+    /** Change room settings via emitter - you would need a running monitor (or the phone app) 
+     *  to see the change take place. See test 005 for another example.
+     *  Boost Office temperature for 60 minutes.
+     */
+    wiser.eventEmitter.emit('setRoomMode',{
+        roomIdOrName: 'Office',
+        mode: 'boost',
+        boostTemp: 21.5, // optional for 'boost'
+        boostDuration: 60,
+    })
   ```
-  ```
 
-* `` - 
+* `wiserMonitorRef` - Tracks running monitors to allow them to be
+  cancelled using the `[removeMonitor](removemonitor)` function.
 
-### eventEmitter
+  You can add other event listeners of your own against this event.
 
-The Node.js event emmitter used for firing and listening to events from the monitor function.
+  The event returns a reference to the setTimeout (loop) of the monitor
+  so it really isn't that useful.
+
+### setRoomMode
+
+Set a specified room to a particular mode ('manual', 'set', 'boost', 'auto', 'off').
+
+* _Manual_: Turn off schedule and set to highest of boost Temperature and current scheduled setpoint
+* _Set_:    Set to boost temperature but leave schedule active, will reset on next scheduled change
+* _Boost_:  Boost to given temperature for given amount of time
+* _Off_:    Turn off schedule and set temperature to -200
+* _Auto_:   Return room to set schedule and current scheduled temperature
+
+Default boost setPoint for Boost, Manual and Set is (20°C). Set the maxBoost setting if you want
+to limit the maximum temperature (if not set, defaults to the system max. of 30°C).
+
+You can either use a single parameter object with the structure:
+
+```jsonc
+{
+    "roomIdOrName": "Office",
+    "mode": "boost",
+    "boostTemp": 19.5, // optional for 'boost'
+    "boostDuration": 60,
+}
+```
+
+Or call with positional parameters:
+
+```javascript
+wiser.setBoostMode(roomIdOrName, mode, boostTemp, boostDuration)
+```
+
+The function returns a Promise.
+
+The room mode can also be set by emitting the `setRoomMode` event with the same parameter object as above
+(that event actually calls this function).
+
+Example use:
+
+```javascript
+const wiser = require('node-drayton-wiser')()
+
+const wiserConfig = {
+    ip: process.env.WISER_IP,
+    secret: process.env.WISER_SECRET,
+    maxBoost: 22,
+}
+wiser.setConfig(wiserConfig)
+// Manual override, attempt 22.8, will auto-reset to 22 (see settings above)
+wiser.setRoomMode('Office','set', 22.8).then( data => {
+    console.info('Office, 22.8 - WORKED, this is correct BUT max temp should be 22.0 (should also see a warning msg):', data)
+}).catch( err => {
+    console.error('Test 004c - Office, 22.8 - FAILED, it should have worked:', err)
+})
+
+```
+
+
+### setMaxBoost
+
+Sets the maximum temperature (in °C) allowed for any manual, boost, or scheduled temperature.
+
+When temperature is set from this module, the input is changed to this maximum if needed.
+
+The following is not yet completed: When set from a schedule or the mobile app, the next iteration of the monitor (if running) will reset the max. temperature.
+
+### setBoostCancelTime
+
+Not yet completed.
+
+### setFolder
+
+Not yet completed.
 
 ### testConnection
 
@@ -209,21 +309,15 @@ The following functions can only be used from within the `.then` function of get
 containing the latest data from the controller is not populated.
 
 #### getRoom
+
+Gets the latest data about the given room ID (numeric).
+
 #### getRoomByName
+
+Gets the latest data about the given room name (string).
 #### getRoomStat
-#### doRoomMap
 
-### setRoomMode
-
-Set a specified room to a particular mode ('manual', 'set', 'boost', 'auto', 'off').
-
-* _Manual_: Turn off schedule and set to highest of boost Temperature and current scheduled setpoint
-* _Set_:    Set to boost temperature but leave schedule active, will reset on next scheduled change
-* _Boost_:  Boost to given temperature for given amount of time
-* _Off_:    Turn off schedule and set temperature to -200
-* _Auto_:   Return room to set schedule and current scheduled temperature
-
-Default boost setPoint for Boost, Manual and Set is (20°C)
+Not yet completed.
 
 ## To Do
 
@@ -248,9 +342,9 @@ Default boost setPoint for Boost, Manual and Set is (20°C)
   * [x] Allow cancellation/removal of a monitor
   * [x] If trying to create an existing monitor name, cancel and re-create
   * [ ] Output added/deleted items not just updated?
-  * [ ] On change limit any boost/manual overrides (from real app) to a given max (stop people setting to silly temperatures)
+  * [ ] On change, limit any boost/manual overrides (from real app) to a given max (stop people setting to silly temperatures) - currently only implemented for this modules set functions.
 
 * Additional general settings
   * [x] default file location (for schedule files) `{string}`
   * [x] max boost temperature `{number}`
-  * [x] Boost cancel time `{Date|null}`
+  * [x] Boost cancel time `{String|null}`
