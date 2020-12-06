@@ -798,7 +798,6 @@ const Wiser = function() {
         getRoom,
         getRoomByName,
         getRoomStat,
-        doRoomMap,
         setRoomMode,
         setMaxBoost,
         setBoostCancelTime,
