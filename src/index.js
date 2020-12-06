@@ -595,10 +595,11 @@ const Wiser = function() {
 
         // Allow params to be passed as settings object
         if ( roomIdOrName !== null && roomIdOrName.constructor.name === "Object" ) {
+            
             if ( roomIdOrName.mode ) mode = roomIdOrName.mode
             else mode = undefined
 
-            if ( roomIdOrName.boostTemp ) mode = roomIdOrName.boostTemp
+            if ( roomIdOrName.boostTemp ) boostTemp = roomIdOrName.boostTemp
             if ( roomIdOrName.boostDuration ) boostDuration = roomIdOrName.boostDuration
 
             if ( roomIdOrName.roomIdOrName ) roomIdOrName = roomIdOrName.roomIdOrName
