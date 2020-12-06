@@ -1,0 +1,585 @@
+[
+    {
+        "id": "e1004fd8.585ae",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "001-connect",
+        "func": "const wiser = global.get('wiser')\n\n//wiser.debug()\n\n// Quick Connection Test\nwiser.testConnection()\n    .then( d => {\n        msg.payload = d\n        msg.topic = 'Wiser Test Connection'\n        node.send(msg)\n    })\n\n// Test get of specific controller data section\nwiser.get('network')\n    .then( res => {\n        if ( res.error ) {\n            msg.payload = res.error\n            msg.topic = 'Wiser Get ERROR'\n            node.send(msg)\n        } else {\n            msg.payload = res\n            msg.topic = 'Wiser Get SUCCESS'\n            node.send(msg)\n        }\n        node.done()\n    })\n    .catch( err => {\n        msg.payload = err\n        msg.topic = 'Wiser Get ERROR (catch)'\n        node.send(msg)\n        node.done()\n    })\n\n//return msg",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 350,
+        "y": 1320,
+        "wires": [
+            [
+                "e8a23361.0affb"
+            ]
+        ]
+    },
+    {
+        "id": "e8a23361.0affb",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1320,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "6ad3b59d.286d7c",
+        "type": "inject",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Run",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.5",
+        "topic": "Start Query",
+        "payload": "#:(file)::wiserSettings",
+        "payloadType": "global",
+        "x": 150,
+        "y": 1320,
+        "wires": [
+            [
+                "e1004fd8.585ae"
+            ]
+        ],
+        "info": "Inject `flow.wiser` variable"
+    },
+    {
+        "id": "bdc58ddb.d0753",
+        "type": "comment",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Tests of node-drayton-wiser - change settings.js and do \"Run First\" before running tests",
+        "info": "For these to work, you have to:\n\n```bash\ncd ~/.node-red\nnpm install TotallyInformation/node-drayton-wiser\n```\n\nThen change settings.js to include:\n\n```javascript\n// ...\nfunctionGlobalContext: {\n    // ...\n    wiser: require('node-drayton-wiser')(),\n    // ...\n},\n// ...\n```\n\nThat gives you a single instance of the wiser\nfunction that you can then simply reference \nin multiple function nodes by including\n\n```javascript\nconst wiser = global.get('wiser')\n```\n\nat the start of each node.",
+        "x": 380,
+        "y": 1020,
+        "wires": []
+    },
+    {
+        "id": "a116927d.fa36d",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "005-monitor",
+        "func": "/** Start the monitor function, configure event listeners and send events */\n// ** Run the flow to set up the event listeners first **\n\nconst refMonitor = '005MonitorSet'\n\nconst wiser = global.get('wiser')\n\n// Run the monitor in the background - starts the event system as well\nwiser.monitor(refMonitor)\n\nreturn {\n    topic: 'wiser/Monitor-Started',\n    payload: `NOTE: It takes at least 2 intervals before any listeners will start to output`\n}\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 350,
+        "y": 1440,
+        "wires": [
+            [
+                "4033cdf6.8ad5f4"
+            ]
+        ]
+    },
+    {
+        "id": "4033cdf6.8ad5f4",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "d": true,
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1440,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "880bc7be.894388",
+        "type": "inject",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "(Re)Start Monitor",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.5",
+        "topic": "Start Query",
+        "payload": "#:(file)::wiserSettings",
+        "payloadType": "global",
+        "x": 180,
+        "y": 1440,
+        "wires": [
+            [
+                "a116927d.fa36d"
+            ]
+        ],
+        "info": "Inject `flow.wiser` variable"
+    },
+    {
+        "id": "7c6c0001.eebde",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "000-set-config",
+        "func": "/** Create class instance and try to connect */\n// const require = global.get('require')\n// const wiser = require('node-drayton-wiser')()\n\nconst wiser = global.get('wiser')\n\n/** Set the configuration to be used\n * @param {Object} config IP address and API secret key of controller\n * @param {string} config.ip IP address of Wiser controller\n * @param {string} config.secret API secret key for accessing the controller\n * @param {number} [config.interval] Optional. Scan interval in seconds. Defaults to 60s\n */\nwiser.setConfig({\n    ip: msg.payload.host,\n    secret: msg.payload.secret,\n    interval: 60,\n    maxBoost: 19,\n})\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 360,
+        "y": 1060,
+        "wires": [
+            [
+                "6d69dbe9.a7acd4"
+            ]
+        ]
+    },
+    {
+        "id": "6d69dbe9.a7acd4",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "d": true,
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1060,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "fbad2bd5.564418",
+        "type": "inject",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Run First",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.5",
+        "topic": "Start Query",
+        "payload": "#:(file)::wiserSettings",
+        "payloadType": "global",
+        "x": 160,
+        "y": 1060,
+        "wires": [
+            [
+                "7c6c0001.eebde",
+                "94823425.5093b8"
+            ]
+        ],
+        "info": "Inject `flow.wiser` variable"
+    },
+    {
+        "id": "94823425.5093b8",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "000-set-listeners",
+        "func": "const wiser = global.get('wiser')\n\n// Get rid of old listeners\nwiser.eventEmitter.eventNames().forEach( evtName => {\n    wiser.eventEmitter.listeners(evtName).forEach( listener => {\n        wiser.eventEmitter.removeListener(evtName, listener)\n    })\n})\n\nwiser.eventEmitter.on('wiserPing', function(ts) {\n    msg.topic = 'wiser/event/ping'\n    msg.payload = ts\n    node.send([null, msg])\n})\n\nwiser.eventEmitter.on('wiserChange', function(changes) {\n    msg.topic = `wiser/event/change/${changes.type}/${changes.id}`\n    msg.payload = changes\n    node.send([msg, msg])\n})\n\nwiser.eventEmitter.on('wiserError', function(error) {\n    msg.topic = 'wiser/event/error'\n    msg.payload = error.message\n    node.send([msg, msg])\n})\n\nwiser.eventEmitter.on('wiserMonitorRemoved', function(ref) {\n    msg.topic = 'wiser/event/monitorRemoved'\n    msg.payload = ref\n    node.send([msg, msg])\n})\n\n\n//const wiserMonitorRefs = global.get('wiserMonitorRefs','file') || {}\n\n// NO LONGER REQUIRED\n// Capture the setInterval reference from the monitor fn so that it can be cancelled if required\n// const myEvt = wiser.eventEmitter.on('wiserMonitorRef', function(ref) {\n//     // node.log('ref', ref)\n//     // node.warn(`wiserMonitorRefs[\"${ref.monitorRef}\"]`)\n//     global.set(`wiserMonitorRefs[\"${ref.monitorRef}\"]`, ref.timeoutRef)\n// })\n\n//node.log('myEvt',myEvt)\n",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 360,
+        "y": 1100,
+        "wires": [
+            [
+                "a65340f3.269c1"
+            ],
+            [
+                "8aa92ecb.52a4b"
+            ]
+        ],
+        "inputLabels": [
+            "trigger"
+        ],
+        "outputLabels": [
+            "debug",
+            "mqtt"
+        ]
+    },
+    {
+        "id": "a65340f3.269c1",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1100,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "abcd7d6a.ca621",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "000-list-listeners",
+        "func": "const wiser = global.get('wiser')\n\nout = {\n    topic: 'EVENTS & EVENT LISTENERS',\n    payload: {}\n}\n\nwiser.eventEmitter.eventNames().forEach( evtName => {\n    out.payload[evtName] = wiser.eventEmitter.listeners(evtName)\n})\n\nreturn out\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 360,
+        "y": 1200,
+        "wires": [
+            [
+                "c23f4331.75084"
+            ]
+        ]
+    },
+    {
+        "id": "c23f4331.75084",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1200,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "4cf1324a.b9807c",
+        "type": "inject",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Run",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.5",
+        "topic": "Start Query",
+        "payload": "#:(file)::wiserSettings",
+        "payloadType": "global",
+        "x": 150,
+        "y": 1200,
+        "wires": [
+            [
+                "abcd7d6a.ca621"
+            ]
+        ],
+        "info": "Inject `flow.wiser` variable"
+    },
+    {
+        "id": "95f40309.ac52b",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "000-delete-listeners",
+        "func": "/** Start the monitor function, configure event listeners and send events */\n\nconst wiser = global.get('wiser')\n\nwiser.eventEmitter.eventNames().forEach( evtName => {\n    wiser.eventEmitter.listeners(evtName).forEach( listener => {\n        wiser.eventEmitter.removeListener(evtName, listener)\n    })\n})",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 370,
+        "y": 1240,
+        "wires": [
+            [
+                "3b5d1faf.e7025"
+            ]
+        ]
+    },
+    {
+        "id": "3b5d1faf.e7025",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1240,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "5b831bea.f91d04",
+        "type": "inject",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Run",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.5",
+        "topic": "Start Query",
+        "payload": "#:(file)::wiserSettings",
+        "payloadType": "global",
+        "x": 150,
+        "y": 1240,
+        "wires": [
+            [
+                "95f40309.ac52b"
+            ]
+        ],
+        "info": "Inject `flow.wiser` variable"
+    },
+    {
+        "id": "b26489d8.548c48",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "003-get-room",
+        "func": "const wiser = global.get('wiser')\n\n// By Name\nwiser.getFull()\n    .then( fullData => {\n        let room = wiser.getRoomByName('Office') // Get by name\n\n        msg.topic = 'GET ROOM by name'\n        msg.payload = room\n        node.send(msg)\n    })\n\n// By ID\nwiser.getFull()\n    .then( fullData => {\n        let room = wiser.getRoom(8) // Get by room id (8=Office)\n        \n        msg.topic = 'GET ROOM by id'\n        msg.payload = room\n        node.send(msg)\n    })\n\n// By ID - with invalid ID\nwiser.getFull()\n    .then( fullData => {\n        let room = wiser.getRoom(999) // Invalid room ID\n        \n        msg.topic = 'GET ROOM by id - invalid ID'\n        msg.payload = room\n        node.send(msg)\n    })\n\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 360,
+        "y": 1360,
+        "wires": [
+            [
+                "17c3b366.9a5b7d"
+            ]
+        ]
+    },
+    {
+        "id": "17c3b366.9a5b7d",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1360,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "215bb30a.d85b0c",
+        "type": "inject",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Run",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.5",
+        "topic": "Start Query",
+        "payload": "#:(file)::wiserSettings",
+        "payloadType": "global",
+        "x": 150,
+        "y": 1360,
+        "wires": [
+            [
+                "b26489d8.548c48"
+            ]
+        ],
+        "info": "Inject `flow.wiser` variable"
+    },
+    {
+        "id": "9613e398.fc70b",
+        "type": "inject",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Run",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.5",
+        "topic": "Start Query",
+        "payload": "#:(file)::wiserSettings",
+        "payloadType": "global",
+        "x": 150,
+        "y": 1400,
+        "wires": [
+            [
+                "96156aef.c868d8"
+            ]
+        ],
+        "info": "Inject `flow.wiser` variable"
+    },
+    {
+        "id": "96156aef.c868d8",
+        "type": "function",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "004-set-room-mode",
+        "func": "const wiser = global.get('wiser')\n\nnode.warn(Object.keys(wiser))\n\n//console.assert( wiser.setRoomMode('Office','off'), 'This should not have failed' )\n\n/** \n * @param {string|number} RoomIdOrName\n * @param {('manual'|'set'|'boost'|'off'|'auto')} mode Room mode (manual|set|boost|off|auto)\n * @param {number} [boostTemp] Temperature SetPoint for boost mode (°C, min=5, max=30). Optional, default 20\n * @param {number} [boostDuration] Duration for boost mode (minutes). Optional, default 30min\n * @return {boolean} TRUE if successful, FALSE if not\n */\n//wiser.setRoomMode('Office','off')\n//wiser.setRoomMode('Office','auto')\n//wiser.setRoomMode('Office','manual')\n//wiser.setRoomMode('Office','manual', 19)\n//wiser.setRoomMode('Office','set', 19.8)\n//wiser.setRoomMode('Office','boost', 19.8, 60)\n\n// Manual override, attempt 19.8, will auto-reset to 19 (see settings above)\nwiser.setRoomMode('Office','set', 19.8).then( data => {\n    //console.assert( data.lastResult.Mode === 'Auto', `Result should be \"Auto\" not ${data.lastResult.Mode}` )\n    node.send({\n        'topic': 'Test 004c',\n        payload: {\n            'txt': 'Test 004c- Office, 19.8 - WORKED, this is correct BUT max temp should be 19.0 (should also see a warning msg):', \n            'data': data\n        }\n    })\n}).catch( err => {\n    node.error('Test 004c - Office, 19.8 - FAILED, it should have worked:', err)\n})\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 370,
+        "y": 1400,
+        "wires": [
+            [
+                "91ba0d23.e74ed"
+            ]
+        ]
+    },
+    {
+        "id": "91ba0d23.e74ed",
+        "type": "debug",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 595,
+        "y": 1400,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "8aa92ecb.52a4b",
+        "type": "mqtt out",
+        "z": "5435eb9b.7f4664",
+        "g": "ef9c4021.119dc",
+        "name": "Home",
+        "topic": "",
+        "qos": "0",
+        "retain": "false",
+        "broker": "3784c9f0.57bab6",
+        "x": 580,
+        "y": 1140,
+        "wires": []
+    },
+    {
+        "id": "3784c9f0.57bab6",
+        "type": "mqtt-broker",
+        "name": "nrmain-local",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "nrmain-local",
+        "usetls": false,
+        "compatmode": false,
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "services/nrmain",
+        "birthQos": "0",
+        "birthRetain": "true",
+        "birthPayload": "Online",
+        "closeTopic": "services/nrmain",
+        "closeQos": "0",
+        "closeRetain": "true",
+        "closePayload": "Offline",
+        "willTopic": "services/nrmain",
+        "willQos": "0",
+        "willRetain": "true",
+        "willPayload": "Offline"
+    }
+]
