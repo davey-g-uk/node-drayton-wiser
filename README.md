@@ -31,21 +31,24 @@ Install the usual way using npm.
 
 Example code:
 
+See the tests folder of this module for more examples including how to change room overrides.
+
 ```javascript
 // Creates a singleton closure
 const wiser = require('node-drayton-wiser')()
 
 /** Listen for ping events - see the interval setting that defines the frequence of updates
  *  This happens every time the monitor function successfully gets data from the controller
+ * @listens node-drayton-wiser:wiserMonitor#wiserPing
+ * @param {Object} pingData Timestamp (ISO string), name and initial run flag of the ping
  */
-wiser.eventEmitter.on('wiserPing', function(ts) { // {'updated': new Date()}
-    console.log('wiserPing', ts)
+wiser.eventEmitter.on('wiserPing', function(pingData) {
+    console.log('wiserPing', pingData)
 })
 
 /** wiserChange event - fired by the monitor function on each interface IF a relavent change is seen
  * Allows you to just monitor for changes to important things.
  * Ignores, controller timestamps and changes to device signal stregth which are too common.
- *
  * @listens node-drayton-wiser:wiserMonitor#wiserChange
  * @param {object} changes - Changes data for wiserChange event
  * @param {Date} changes.updated - JavaScript timestamp of the detection of the change
@@ -55,13 +58,16 @@ wiser.eventEmitter.on('wiserPing', function(ts) { // {'updated': new Date()}
  * @param {Object} changes.data - The changed data
  * @param {string} [changes.name] - Room name (only for Room changes)
  */
-wiser.eventEmitter.on('wiserChange', function(changes) { // {'updated': new Date(), 'type': type, 'ID': id, 'Changes': data}
+wiser.eventEmitter.on('wiserChange', function(changes) {
     console.log('wiserChange event:', changes )
 })
 
-/** Listen for an error event from the monitor function */
-wiser.eventEmitter.on('wiserError', function(error) { // {'updated': new Date(), 'error': err}
-    console.log('wiserChange event:', error )
+/** Listen for an error event from the monitor function
+ * @listens node-drayton-wiser:wiserMonitor#wiserError
+ * @param {Object} error Error data object
+ */
+wiser.eventEmitter.on('wiserError', function(error) {
+    console.log('wiserError event:', error )
 })
 
 /** Set the configuration `ip` and `secret` are required 
@@ -222,16 +228,29 @@ Default boost setPoint for Boost, Manual and Set is (20°C)
 ## To Do
 
 * Add set functions
-  * Started, setRoomMode is now available
+  * [x] `setRoomMode` - set/reset room temperature/boost overrides
+  * [x] `setMaxBoost` - Set max boost level (will auto-change boosts to max if set higher)
+  * [x] `setBoostCancelTime` - Set auto-cancel overrides - set a time that will reset all rooms back to current schedule
+  * [x] `setFolder` - set the folder to use for schedule files
+  * [x] `removeMonitor` - Remove a monitor function by given monitor name, fires `wiserMonitorRemoved` event
+  * [ ] Cancel all boost/reset all rooms to current schedule
+  * [ ] Upload/change schedule, apply schedule id to room
   
 * Add save/load schedule functions
-  
   Allow save/load to/from file as well as to/from JSON
-
-* On change limit any boost/manual overrides (from real app) to a given max (stop people setting to silly temperatures)
+  * [ ] `saveAllSchedules`
+  * [ ] `saveSchedule`
   
 * Reset all boosts/manual overrides at given time of day (stop people turning on boost when they go to bed!)
 
-* Output added/deleted items not just updated?
-  
-* Add default ref name to monitor function
+* Monitor function:
+  * [x] Add default ref name to monitor function
+  * [x] Allow cancellation/removal of a monitor
+  * [x] If trying to create an existing monitor name, cancel and re-create
+  * [ ] Output added/deleted items not just updated?
+  * [ ] On change limit any boost/manual overrides (from real app) to a given max (stop people setting to silly temperatures)
+
+* Additional general settings
+  * [x] default file location (for schedule files) `{string}`
+  * [x] max boost temperature `{number}`
+  * [x] Boost cancel time `{Date|null}`
