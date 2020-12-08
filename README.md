@@ -349,7 +349,9 @@ Not yet completed.
    * to output `wiserFullUpdate` event and data making it easy to save in calling
      functions and Node-RED.
    * Move most processing out of try/catch as it isn't needed inside and might hide errors
-* Update Node-RED example flow. Now saves the full data to a flow variable and updates it
+* Update Node-RED example flow:
+  * Now saves the full data to a flow variable and updates it.
+  * Has an example flow to reset all rooms back to the current schedule.
 
 ### 0.1.0-dev2 (or previous)
 
