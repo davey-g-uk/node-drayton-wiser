@@ -374,31 +374,35 @@ const Wiser = function() {
         return  out
     } // --- End of get() --- //
 
-    /** Get the full  */
+    /** Get the full set of data from the controller
+     * @fires wiserFullUpdate - Emits a reference to the full controller data after each call
+     * @return {Promise} Containing either a reference to the full data object or the error object
+     */
     const getFull = async () => {
+        let result
+
         try {
-            const result = await axios.get(servicePaths['full'], axiosConfig)
-            // Update the saved data and the room/device map
-            saved = result.data
-            doRoomMap()
-            return saved
+            result = await axios.get(servicePaths['full'], axiosConfig)
         } catch (error) {
             console.error(error)
             return {'error': error}
         }
 
+        // Update the saved data and the room/device map
+        saved = result.data
 
-            // .then( res => {
-            //     // Update the saved data and the room/device map
-            //     saved = res.data
-            //     doRoomMap()
-            //     // Return the data (as a Promise)
-            //     return res.data
-            // })
-            // .catch(error => {
-            //     console.error(error)
-            //     return {'error': error}
-            // })
+        doRoomMap()
+
+        /** Emit the full data reference
+         *  So it can be used in the calling function (e.g. Node-RED)
+         *
+         * @event #wiserFullUpdate
+         * @type {object} Full data object from the controller
+         */
+        eventEmitter.emit('wiserFullUpdate', saved )
+
+        return saved
+
     } // ---- end of getFull ---- //
 
     /** Remove an existing monitor if it exists (does not error if it doesn't exist)
@@ -431,6 +435,14 @@ const Wiser = function() {
         /** Get initial full data from Wiser Controller */
         getFull()
             .then( res => {
+                /**
+                 * wiserPing event. Emit on monitor startup after getting a full update from the controller.
+                 *
+                 * @event wiserMonitor#wiserPing
+                 * @type {object}
+                 * @property {string} monitorRef - Reference to specific instance of the monitor() fn
+                 * @property {Date} updated - JavaScript timestamp of the detection of the change
+                 */
                 eventEmitter.emit('wiserPing', {'monitorRef': ref, 'updated': new Date(), 'initialRun': true} )
 
                 /** We are not interested in the controllers timestamp changes */
@@ -454,7 +466,7 @@ const Wiser = function() {
                     getFull()
                         .then( res => {
                             /**
-                             * wiserPing event. Emitted after getting a full update from the controller.
+                             * wiserPing event. Emitted on each loop after getting a full update from the controller.
                              *
                              * @event wiserMonitor#wiserPing
                              * @type {object}
@@ -558,7 +570,6 @@ const Wiser = function() {
                  * @property {string} monitorRef - Reference to specific instance of the monitor() fn
                  * @property {Timeout} timeoutRef - Reference to Timeout so that it can be cancelled
                  */
-
                 eventEmitter.emit('wiserMonitorRef', {'monitorRef': ref, 'timeoutRef': intervalFn} )
             })
             .catch( err => {

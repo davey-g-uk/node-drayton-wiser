@@ -165,6 +165,7 @@ When a change is detected by the monitor it fires one or more events as follows.
 #### Output Events - other
 
 * `wiserMonitorRemoved` - Output if a monitor is restarted or if the `[removeMonitor](#removemonitor)` function is called.
+* `wiserFullUpdate` - output each time the getFull function successfully gets an update from the controller. Mostly due to a running monitor but getFull can also be called manually. Returns a reference to the full data object returned by the controller.
 #### Input Events
 
 The module also automatically listens for the following events:
@@ -322,11 +323,6 @@ Not yet completed.
 ## To Do
 
 * Add set functions
-  * [x] `setRoomMode` - set/reset room temperature/boost overrides
-  * [x] `setMaxBoost` - Set max boost level (will auto-change boosts to max if set higher)
-  * [x] `setBoostCancelTime` - Set auto-cancel overrides - set a time that will reset all rooms back to current schedule
-  * [x] `setFolder` - set the folder to use for schedule files
-  * [x] `removeMonitor` - Remove a monitor function by given monitor name, fires `wiserMonitorRemoved` event
   * [ ] Cancel all boost/reset all rooms to current schedule
   * [ ] Upload/change schedule, apply schedule id to room
   
@@ -336,13 +332,38 @@ Not yet completed.
   * [ ] `saveSchedule`
   
 * Reset all boosts/manual overrides at given time of day (stop people turning on boost when they go to bed!)
+* check if specific named monitor is running
+* reset all rooms
+
+* Monitor function:
+  * [ ] Output added/deleted items not just updated?
+  * [ ] On change, limit any boost/manual overrides (from real app) to a given max (stop people setting to silly temperatures) - currently only implemented for this modules set functions.
+  * [ ] On change, check if coming off boost, if so maybe have a separate event generated.
+
+## Change Log
+
+### 0.1.0-dev3
+
+* New event, `wiserFullUpdate` - outputs reference to full data from the controller
+* Change `getFull()`:
+   * to output `wiserFullUpdate` event and data making it easy to save in calling
+     functions and Node-RED.
+   * Move most processing out of try/catch as it isn't needed inside and might hide errors
+* Update Node-RED example flow. Now saves the full data to a flow variable and updates it
+
+### 0.1.0-dev2 (or previous)
+
+* Add set functions
+  * [x] `setRoomMode` - set/reset room temperature/boost overrides
+  * [x] `setMaxBoost` - Set max boost level (will auto-change boosts to max if set higher)
+  * [x] `setBoostCancelTime` - Set auto-cancel overrides - set a time that will reset all rooms back to current schedule
+  * [x] `setFolder` - set the folder to use for schedule files
+  * [x] `removeMonitor` - Remove a monitor function by given monitor name, fires `wiserMonitorRemoved` event
 
 * Monitor function:
   * [x] Add default ref name to monitor function
   * [x] Allow cancellation/removal of a monitor
   * [x] If trying to create an existing monitor name, cancel and re-create
-  * [ ] Output added/deleted items not just updated?
-  * [ ] On change, limit any boost/manual overrides (from real app) to a given max (stop people setting to silly temperatures) - currently only implemented for this modules set functions.
 
 * Additional general settings
   * [x] default file location (for schedule files) `{string}`

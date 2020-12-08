@@ -1,7 +1,7 @@
 {
   "name": "node-drayton-wiser",
   "description": "A (currently experimental) Node.js module for working with the Drayton Wiser smart heating system.",
-  "version": "0.1.0-dev2",
+  "version": "0.1.0-dev3",
   "main": "src/index.js",
   "scripts": {
     "start": "node --trace-warnings --inspect-brk tests/004-set-room-mode.js",
