@@ -73,7 +73,7 @@ const Wiser = function() {
     const SystemOverrideType = {
         normal : 0,
         away: 2,
-        bootAllRooms: 4,
+        boostAllRooms: 4,
         cancelAllOverrides: 5
     }
 
@@ -417,21 +417,25 @@ const Wiser = function() {
     */
     const setSystemMode = async (overrideMode) => {
         let result
-        let payload = {
-            RequestOverride: {
-                Type : SystemOverrideType[overrideMode],
-            },
-        };
-        
-        try {
-            result = await axios.patch(servicePath['system'], payload, axiosConfig);
-            console.dir(result);
-        } catch (error) {
-            console.error(error);
-            return {'error' : error};
-        }
+        if (SystemOverrideType.hasOwnProperty(overrideMode)) {
+            let payload = {
+                RequestOverride: {
+                    Type : SystemOverrideType[overrideMode],
+                },
+            };
+            
+            try {
+                result = await axios.patch(servicePaths['system'], payload, axiosConfig);
+            } catch (error) {
+                console.error(error);
+                return {'error' : error};
+            }
 
-        return result;
+            return result.data;
+        } else {
+            console.warn(`[node-drayton-wiser:setSystemMode] overrideMode not a valid . Ignored. --${overrideMode}--`)
+            return false;
+        };
     }
     /** Remove an existing monitor if it exists (does not error if it doesn't exist)
      * @param {string} ref Unique reference string that will be returned with the wiserMonitorRef event so that a specific monitor can be cancelled

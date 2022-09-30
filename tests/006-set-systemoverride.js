@@ -4,12 +4,14 @@ function runTest() {
 
     wiser.setConfig({
         ip: process.env.WISER_IP,
-        secret: //process.env.WISER_SECRET,
+        secret: process.env.WISER_SECRET,
     })
 
-    // We have to get some data before we can examine the rooms
+    // Make Call to system and set to away mode (returns system data);
     wiser.setSystemMode('away').then (resp => console.log(resp));
-    
+
+    // Try setting a non-existant mode (should throw error)
+    wiser.setSystemMode('home').then (resp => console.log(resp));
 }
 
 // Allows us to run either directly or via another node.js script
