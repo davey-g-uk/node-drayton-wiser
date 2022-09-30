@@ -70,6 +70,13 @@ const Wiser = function() {
         trvs: '/data/domain/SmartValve/',
     }
 
+    const SystemOverrideType = {
+        normal : 0,
+        away: 2,
+        bootAllRooms: 4,
+        cancelAllOverrides: 5
+    }
+
     const settings = {
         /** Interval between calls to get the full Controller data and calculate diffs
          * @type {number} Integer seconds
@@ -405,6 +412,27 @@ const Wiser = function() {
 
     } // ---- end of getFull ---- //
 
+    /** Set the system in to away mode
+        * @return {Promise} Containing data object or the error object
+    */
+    const setSystemMode = async (overrideMode) => {
+        let result
+        let payload = {
+            RequestOverride: {
+                Type : SystemOverrideType[overrideMode],
+            },
+        };
+        
+        try {
+            result = await axios.patch(servicePath['system'], payload, axiosConfig);
+            console.dir(result);
+        } catch (error) {
+            console.error(error);
+            return {'error' : error};
+        }
+
+        return result;
+    }
     /** Remove an existing monitor if it exists (does not error if it doesn't exist)
      * @param {string} ref Unique reference string that will be returned with the wiserMonitorRef event so that a specific monitor can be cancelled
      * @fires wiserMonitorRemoved - If the referenced monitor existed and has been successfully deleted
@@ -814,6 +842,7 @@ const Wiser = function() {
         setMaxBoost,
         setBoostCancelTime,
         setFolder,
+        setSystemMode,
     }) // --- End of closure --- //
 
 } // ---- End of class ---- //
